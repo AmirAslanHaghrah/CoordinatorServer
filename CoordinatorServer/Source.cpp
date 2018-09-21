@@ -35,18 +35,13 @@ public:
 	char recvbuf[DEFAULT_RECV_BUFLEN];
 	int recvbuflen = DEFAULT_RECV_BUFLEN;
 
-	//char sendbuf[DEFAULT_SEND_BUFLEN];
-	//int sendbuflen = DEFAULT_SEND_BUFLEN;
-
-	//std::thread  threadHandler;
-
 	Client();
+	Client(SOCKET clientSocket, struct sockaddr_in clientAddress);
+
 	~Client();
 
-
-	Client(SOCKET clientSocket, struct sockaddr_in clientAddress);
-	
 	int Close();
+	int Read();
 	int Read(char* buffer, int len);
 	int Write(char* buffer, int len);
 private:
@@ -56,14 +51,15 @@ private:
 Client::Client() {
 }
 
-Client::~Client(){	
-	Close();
-}
-
 Client::Client(SOCKET socket, struct sockaddr_in address) {
 	ClientSocket = socket;
 	ClientAddress = address;
 }
+
+Client::~Client(){	
+	Close();
+}
+
 
 int Client::Close() {
 	int iResult;
@@ -99,6 +95,27 @@ int Client::Read(char* buffer, int len) {
 		WSACleanup();
 		return -1;
 	}	
+}
+
+int Client::Read() {
+	int iResult;
+
+	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+	if (iResult > 0) {
+		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+		printf("Received bytes: %.*s\n", iResult, recvbuf);
+		return 1;
+	}
+	else if (iResult == 0) {
+		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+		return 0;
+	}
+	else {
+		printf("recv failed with error: %d\n", WSAGetLastError());
+		closesocket(ClientSocket);
+		WSACleanup();
+		return -1;
+	}
 }
 
 int Client::Write(char* buffer, int len) {
@@ -229,7 +246,7 @@ int clientsCount = 0;
 //};
 
 std::vector<Client> clientList;
-//std::vector<std::thread> ClientConnectionThread;
+std::vector<std::thread> ClientThread;
 
 int __cdecl main(void)
 {
@@ -318,6 +335,7 @@ int __cdecl main(void)
 
 		//ClientConnectionThread.push_back(std::thread(startConnection, ClientSocket, client_addr));
 		clientList.push_back(Client(ClientSocket, client_addr));
+		ClientThread.push_back(std::thread(&Client::Read, &clientList[clientList.size() - 1]));
 	}
 
 
