@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <iostream>
 #include <ctime>
 #include <vector>
 #include <thread>
@@ -27,6 +28,7 @@
 
 class Client{
 public:
+
 	SOCKET ClientSocket;
 	struct sockaddr_in ClientAddress;
 	char IP[16] = "192.168.1.1";
@@ -42,8 +44,9 @@ public:
 
 	int Close();
 	int Read();
-	int Read(char* buffer, int len);
+	//int Read(char* buffer, int len);
 	int Write(char* buffer, int len);
+
 private:
 
 };
@@ -76,46 +79,46 @@ int Client::Close() {
 	closesocket(ClientSocket);
 }
 
-int Client::Read(char* buffer, int len) {
-	int iResult;
-
-	iResult = recv(ClientSocket, buffer, len, 0);
-	if (iResult > 0) {
-		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-		printf("Received bytes: %.*s\n", iResult, buffer);
-		return 1;
-	}
-	else if (iResult == 0) {
-		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-		return 0;
-	}		
-	else {
-		printf("recv failed with error: %d\n", WSAGetLastError());
-		closesocket(ClientSocket);
-		WSACleanup();
-		return -1;
-	}	
-}
+//int Client::Read(char* buffer, int len) {
+//	int iResult;
+//
+//	iResult = recv(ClientSocket, buffer, len, 0);
+//	if (iResult > 0) {
+//		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+//		printf("Received bytes: %.*s\n", iResult, buffer);
+//		return 1;
+//	}
+//	else if (iResult == 0) {
+//		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+//		return 0;
+//	}		
+//	else {
+//		printf("recv failed with error: %d\n", WSAGetLastError());
+//		closesocket(ClientSocket);
+//		WSACleanup();
+//		return -1;
+//	}	
+//}
 
 int Client::Read() {
 	int iResult;
-
 	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 	if (iResult > 0) {
 		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
 		printf("Received bytes: %.*s\n", iResult, recvbuf);
-		return 1;
+		//return 1;
 	}
 	else if (iResult == 0) {
 		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-		return 0;
+		//return 0;
 	}
 	else {
 		printf("recv failed with error: %d\n", WSAGetLastError());
 		closesocket(ClientSocket);
 		WSACleanup();
-		return -1;
+		//return -1;
 	}
+	return iResult;
 }
 
 int Client::Write(char* buffer, int len) {
@@ -226,10 +229,6 @@ int Client::Write(char* buffer, int len) {
 //}
 
 
-
-
-
-
 //int startConnection(SOCKET ClientSocket, struct sockaddr_in client_addr);
 
 int clientsCount = 0;
@@ -247,6 +246,8 @@ int clientsCount = 0;
 
 std::vector<Client> clientList;
 std::vector<std::thread> ClientThread;
+
+void readdata(Client c);
 
 int __cdecl main(void)
 {
@@ -334,9 +335,13 @@ int __cdecl main(void)
 		iSendResult = send(ClientSocket, (char*)(int)ntohs(client_addr.sin_port), 4, 0);
 
 		//ClientConnectionThread.push_back(std::thread(startConnection, ClientSocket, client_addr));
-		clientList.push_back(Client(ClientSocket, client_addr));
-		ClientThread.push_back(std::thread(&Client::Read, &clientList[clientList.size() - 1]));
+		clientList.push_back(Client(ClientSocket, client_addr));			
+
+		//std::thread t(&Client::Read, &clientList[clientList.size() - 1]);
+		ClientThread.push_back(std::thread(readdata, clientList[clientList.size() - 1]));
+		//ClientThread.push_back(t);
 	}
+
 
 
 	/*
@@ -401,6 +406,13 @@ int __cdecl main(void)
 	WSACleanup();
 	system("pause");
 	return 0;
+}
+
+void readdata(Client c) {
+	int result;
+	do {
+		result = c.Read();
+	} while (result > 0);
 }
 
 //int startConnection(SOCKET ClientSocket, struct sockaddr_in client_addr) {
