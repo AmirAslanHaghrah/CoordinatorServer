@@ -102,22 +102,26 @@ int Client::Close() {
 
 int Client::Read() {
 	int iResult;
-	iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-	if (iResult > 0) {
-		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-		printf("Received bytes: %.*s\n", iResult, recvbuf);
-		//return 1;
-	}
-	else if (iResult == 0) {
-		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-		//return 0;
-	}
-	else {
-		printf("recv failed with error: %d\n", WSAGetLastError());
-		closesocket(ClientSocket);
-		WSACleanup();
-		//return -1;
-	}
+	do {
+
+
+		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0) {
+			printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+			printf("Received bytes: %.*s\n", iResult, recvbuf);
+			//return 1;
+		}
+		else if (iResult == 0) {
+			printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+			//return 0;
+		}
+		else {
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+			//return -1;
+		}
+	} while (iResult > 0);
 	return iResult;
 }
 
@@ -335,14 +339,17 @@ int __cdecl main(void)
 		iSendResult = send(ClientSocket, (char*)(int)ntohs(client_addr.sin_port), 4, 0);
 
 		//ClientConnectionThread.push_back(std::thread(startConnection, ClientSocket, client_addr));
-		clientList.push_back(Client(ClientSocket, client_addr));			
 
-		//std::thread t(&Client::Read, &clientList[clientList.size() - 1]);
-		ClientThread.push_back(std::thread(readdata, clientList[clientList.size() - 1]));
+		//Client *client = new Client(ClientSocket, client_addr);
+
+		//clientList.push_back(Client(ClientSocket, client_addr));
+		clientList.push_back(*new Client(ClientSocket, client_addr));
+		
+		//ClientThread.push_back(std::thread(&Client::Read, client));
 		//ClientThread.push_back(t);
+		
+		
 	}
-
-
 
 	/*
 	// Accept a client socket
