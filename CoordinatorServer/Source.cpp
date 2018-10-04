@@ -14,6 +14,7 @@
 #include <vector>
 #include <thread>
 #include <string>
+#include <functional>
 
 // Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
@@ -43,7 +44,7 @@ public:
 
 	int Close();
 	int Read();
-	//int Read(char* buffer, int len);
+	int Read(char* buffer, int len);
 	int Write(char* buffer, int len);
 
 private:
@@ -78,26 +79,26 @@ int Client::Close() {
 	closesocket(ClientSocket);
 }
 
-//int Client::Read(char* buffer, int len) {
-//	int iResult;
-//
-//	iResult = recv(ClientSocket, buffer, len, 0);
-//	if (iResult > 0) {
-//		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-//		printf("Received bytes: %.*s\n", iResult, buffer);
-//		return 1;
-//	}
-//	else if (iResult == 0) {
-//		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
-//		return 0;
-//	}		
-//	else {
-//		printf("recv failed with error: %d\n", WSAGetLastError());
-//		closesocket(ClientSocket);
-//		WSACleanup();
-//		return -1;
-//	}	
-//}
+int Client::Read(char* buffer, int len) {
+	int iResult;
+
+	iResult = recv(ClientSocket, buffer, len, 0);
+	if (iResult > 0) {
+		printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+		printf("Received bytes: %.*s\n", iResult, buffer);
+		return 1;
+	}
+	else if (iResult == 0) {
+		printf("%s\t%d\ close connection.\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
+		return 0;
+	}		
+	else {
+		printf("recv failed with error: %d\n", WSAGetLastError());
+		closesocket(ClientSocket);
+		WSACleanup();
+		return -1;
+	}	
+}
 
 int Client::Read() {
 	int iResult;
@@ -347,9 +348,8 @@ int __cdecl main(void)
 		}
 
 
-		clientList.push_back(new Client(ClientSocket, client_addr));
-		clientThread.push_back(new std::thread(&Client::Read, clientList[clientList.size() - 1]));
-
+		clientList.push_back(new Client(ClientSocket, client_addr));	
+		clientThread.push_back(new std::thread(std::mem_fun(&Client::Read), clientList[clientList.size() - 1]));
 	}
 
 	/*
