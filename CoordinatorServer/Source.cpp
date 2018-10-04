@@ -13,6 +13,7 @@
 #include <ctime>
 #include <vector>
 #include <thread>
+#include <string>
 
 // Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
@@ -31,8 +32,6 @@ public:
 
 	SOCKET ClientSocket;
 	struct sockaddr_in ClientAddress;
-	char IP[16] = "192.168.1.1";
-	int PORT = 80;
 
 	char recvbuf[DEFAULT_RECV_BUFLEN];
 	int recvbuflen = DEFAULT_RECV_BUFLEN;
@@ -103,8 +102,6 @@ int Client::Close() {
 int Client::Read() {
 	int iResult;
 	do {
-
-
 		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 		if (iResult > 0) {
 			printf("%s\t%d\:\n", inet_ntoa(ClientAddress.sin_addr), (int)ntohs(ClientAddress.sin_port));
@@ -248,8 +245,8 @@ int clientsCount = 0;
 //	int status = 0;
 //};
 
-std::vector<Client> clientList;
-std::vector<std::thread> ClientThread;
+std::vector<Client*> clientList;
+std::vector<std::thread*> clientThread;
 
 void readdata(Client c);
 
@@ -318,7 +315,6 @@ int __cdecl main(void)
 		return 1;
 	}
 
-
 	while (true) {
 		// Accept a client socket
 		struct sockaddr_in client_addr;
@@ -334,21 +330,26 @@ int __cdecl main(void)
 
 
 		printf("IP: %s\t", inet_ntoa(client_addr.sin_addr));
-		printf("port: %d", (int)ntohs(client_addr.sin_port));
+		int port = (int)ntohs(client_addr.sin_port);
+		
+		std::string s = std::to_string(port);
+		char const *sendbuf = s.c_str();
+
+		printf("port: %d", port);
 		printf("\t Join!!!\n");
-		iSendResult = send(ClientSocket, (char*)(int)ntohs(client_addr.sin_port), 4, 0);
+		iSendResult = send(ClientSocket, sendbuf, (int)strlen(sendbuf), 0);
+		if (iSendResult == SOCKET_ERROR) {
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+			system("pause");
+			return 1;
+		}
 
-		//ClientConnectionThread.push_back(std::thread(startConnection, ClientSocket, client_addr));
 
-		//Client *client = new Client(ClientSocket, client_addr);
+		clientList.push_back(new Client(ClientSocket, client_addr));
+		clientThread.push_back(new std::thread(&Client::Read, clientList[clientList.size() - 1]));
 
-		//clientList.push_back(Client(ClientSocket, client_addr));
-		clientList.push_back(*new Client(ClientSocket, client_addr));
-		
-		//ClientThread.push_back(std::thread(&Client::Read, client));
-		//ClientThread.push_back(t);
-		
-		
 	}
 
 	/*
@@ -413,13 +414,6 @@ int __cdecl main(void)
 	WSACleanup();
 	system("pause");
 	return 0;
-}
-
-void readdata(Client c) {
-	int result;
-	do {
-		result = c.Read();
-	} while (result > 0);
 }
 
 //int startConnection(SOCKET ClientSocket, struct sockaddr_in client_addr) {
