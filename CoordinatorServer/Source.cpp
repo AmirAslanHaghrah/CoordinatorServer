@@ -23,7 +23,8 @@
 #define DEFAULT_RECV_BUFLEN 512
 #define DEFAULT_SEND_BUFLEN 512
 
-#define DEFAULT_PORT "13690"
+#define DEFAULT_TCP_PORT "13690"
+#define DEFAULT_UDP_PORT 13691
 
 class Client{
 public:
@@ -59,7 +60,6 @@ Client::Client(SOCKET socket, struct sockaddr_in address) {
 Client::~Client(){	
 	Close();
 }
-
 
 int Client::Close() {
 	int iResult;
@@ -133,8 +133,6 @@ int Client::Write(char* buffer, int len) {
 	return 0;
 }
 
-
-
 //#define _CRT_SECURE_NO_WARNINGS
 //
 //#include <iostream>
@@ -181,8 +179,30 @@ int clientsCount = 0;
 std::vector<Client*> clientList;
 std::vector<std::thread*> clientThread;
 
+int startTCPServer();
+int startUDPServer();
+
 int __cdecl main(void)
 {
+	std::thread t1(startTCPServer);
+	std::cout << "TCP Server Successfully Created.\r\n";
+
+	std::thread t2(startUDPServer);
+	std::cout << "UDP Server Successfully Created.\r\n";
+
+	while (true) {
+
+	}
+
+	t1.join();
+	t2.join();
+
+	system("pause");
+	return 0;
+}
+
+
+int startTCPServer() {
 	WSADATA wsaData;
 	int iResult;
 
@@ -193,8 +213,6 @@ int __cdecl main(void)
 	struct addrinfo hints;
 
 	int iSendResult;
-	//char recvbuf[DEFAULT_RECV_BUFLEN];
-	//int recvbuflen = DEFAULT_RECV_BUFLEN;
 
 	// Initialize Winsock
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -210,7 +228,7 @@ int __cdecl main(void)
 	hints.ai_flags = AI_PASSIVE;
 
 	// Resolve the server address and port
-	iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+	iResult = getaddrinfo(NULL, DEFAULT_TCP_PORT, &hints, &result);
 	if (iResult != 0) {
 		printf("getaddrinfo failed with error: %d\n", iResult);
 		WSACleanup();
@@ -262,7 +280,7 @@ int __cdecl main(void)
 
 		printf("IP: %s\t", inet_ntoa(client_addr.sin_addr));
 		int port = (int)ntohs(client_addr.sin_port);
-		
+
 		std::string s = std::to_string(port);
 		char const *sendbuf = s.c_str();
 
@@ -278,7 +296,7 @@ int __cdecl main(void)
 		}
 
 
-		clientList.push_back(new Client(ClientSocket, client_addr));	
+		clientList.push_back(new Client(ClientSocket, client_addr));
 		clientThread.push_back(new std::thread(std::mem_fun(&Client::Read), clientList[clientList.size() - 1]));
 	}
 
@@ -288,12 +306,91 @@ int __cdecl main(void)
 	//}
 
 	WSACleanup();
-	system("pause");
 	return 0;
 }
 
 
+int startUDPServer() {
+	/*
+	Simple UDP Server
+	*/
+	SOCKET s;
+	struct sockaddr_in server, si_other;
+	int slen, recv_len;
+	char buf[DEFAULT_RECV_BUFLEN];
+	WSADATA wsa;
 
+	slen = sizeof(si_other);
+
+	//Initialise winsock
+	printf("\nInitialising Winsock...");
+	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+	{
+		printf("Failed. Error Code : %d", WSAGetLastError());
+		exit(EXIT_FAILURE);
+	}
+	printf("Initialised.\n");
+
+	//Create a socket
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
+	{
+		printf("Could not create socket : %d", WSAGetLastError());
+	}
+	printf("Socket created.\n");
+
+	//Prepare the sockaddr_in structure
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(DEFAULT_UDP_PORT);
+	
+
+	//Bind
+	if (bind(s, (struct sockaddr *)&server, sizeof(server)) == SOCKET_ERROR)
+	{
+		printf("Bind failed with error code : %d", WSAGetLastError());
+		exit(EXIT_FAILURE);
+	}
+	puts("Bind done");
+
+	//keep listening for data
+	while (1)
+	{
+		printf("Waiting for data...\r\n");
+		fflush(stdout);
+
+		//clear the buffer by filling null, it might have previously received data
+		memset(buf, '\0', DEFAULT_RECV_BUFLEN);
+
+		//try to receive some data, this is a blocking call
+		if ((recv_len = recvfrom(s, buf, DEFAULT_RECV_BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
+		{
+			printf("recvfrom() failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
+
+		//print details of the client/peer and the data received
+		printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+		printf("Data: %s\n", buf);
+
+		//now reply the client with the same data
+		if (sendto(s, "echo: ", 7, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+		{
+			printf("sendto() failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
+		//now reply the client with the same data
+		if (sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+		{
+			printf("sendto() failed with error code : %d", WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	closesocket(s);
+	WSACleanup();
+
+	return 0;
+}
 
 ///To Do
 /// 1- Complete ClientDataReceiver and ClientDataSender functions and test them
